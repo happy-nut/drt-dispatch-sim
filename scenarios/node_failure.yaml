@@ -1,0 +1,13 @@
+# 워커 장애 → 샤드 리밸런싱 → 복구 시연
+seed: 7
+duration: 600.0
+real_time_factor: 20.0
+area: {name: 세종시, center_lat: 36.48, center_lon: 127.28, size_km: 10.0, h3_resolution: 7}
+demand: {arrival_rate_per_hour: 420.0, max_wait: 420.0, max_detour_factor: 1.6}
+fleet: {vehicles: 36, capacity: 4}
+cluster: {workers: 4, coordinators: 2, heartbeat_timeout: 6.0}
+bus: {backend: sim, dup_prob: 0.02}
+dispatch: {engine: insertion, virtual_stops: true}
+faults:
+  - {at: 120.0, kind: kill_worker, target: worker-1}
+  - {at: 360.0, kind: add_worker}

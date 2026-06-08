@@ -1,0 +1,13 @@
+# 수요 폭증 → 큐 증가(백프레셔) → spill/회복 시연
+seed: 11
+duration: 600.0
+real_time_factor: 20.0
+area: {name: 세종시, center_lat: 36.48, center_lon: 127.28, size_km: 10.0, h3_resolution: 7}
+demand: {arrival_rate_per_hour: 300.0, max_wait: 420.0, max_detour_factor: 1.6}
+fleet: {vehicles: 30, capacity: 4}
+cluster: {workers: 3, coordinators: 2, throughput_per_tick: 5, queue_high_water: 20}
+bus: {backend: sim}
+dispatch: {engine: insertion, virtual_stops: true}
+faults:
+  - {at: 150.0, kind: demand_surge, factor: 6.0}
+  - {at: 400.0, kind: demand_surge, factor: 1.0}

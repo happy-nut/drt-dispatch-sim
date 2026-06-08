@@ -2,7 +2,7 @@
 
 from drt_sim.engine import DispatchEngine
 from drt_sim.geo import Point, travel_time_seconds
-from drt_sim.models import Request, RequestStatus, StopType, Vehicle
+from drt_sim.models import Request, StopType, Vehicle
 
 
 def make_request(rid, ox, oy, dx, dy, t=0.0, **kw):

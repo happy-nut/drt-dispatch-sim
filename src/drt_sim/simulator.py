@@ -92,7 +92,6 @@ class Simulator:
         req = self._by_id.get(stop.request_id)
         if req is None:
             return
-        arrival = self.now + (self.time_step)  # 근사: 스텝 내 도착
         if stop.stop_type == StopType.PICKUP:
             vehicle.onboard += req.party_size
             req.status = RequestStatus.ONBOARD

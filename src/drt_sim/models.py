@@ -34,6 +34,12 @@ class Request:
     pickup_time: Optional[float] = None
     dropoff_time: Optional[float] = None
 
+    # 분산 메타데이터
+    trace_id: str = ""               # 분산 트레이스 묶음 키
+    pickup_cell: Optional[str] = None    # 승차지 H3 셀 (소유권 라우팅 키)
+    dropoff_cell: Optional[str] = None   # 하차지 H3 셀 (크로스 샤드 판정)
+    assigned_at: Optional[float] = None  # 배차 확정 시각 (배차 지연 측정)
+
     def direct_travel_time(self) -> float:
         from .geo import travel_time_seconds
 
@@ -52,6 +58,7 @@ class RouteStop:
     request_id: int
     stop_type: StopType
     location: Point
+    party_size: int = 1          # 이 정류점이 태우/내리는 인원(정원 검사 정확도)
     # 계획된 도착 예정 시각 (planning 중 채워짐)
     eta: Optional[float] = None
 
@@ -65,6 +72,12 @@ class Vehicle:
     capacity: int = 4
     route: List[RouteStop] = field(default_factory=list)  # 앞에서부터 방문
     onboard: int = 0                                       # 현재 탑승 인원
+    # 분산 소유권 (단일 라이터 + optimistic concurrency)
+    home_cell: Optional[str] = None    # 차량의 home 셀 (소유 샤드 결정)
+    owner_node: Optional[str] = None   # 현재 단일 라이터 노드
+    version: int = 0                   # 낙관적 동시성 버전 (이중 배차 차단)
+    # 유휴 리밸런싱: 승객 없는 선이동(deadhead) 목적지. 승객 경로가 생기면 무시/해제된다.
+    reposition_target: Optional[Point] = None
     # 누적 통계
     distance_traveled: float = 0.0
     busy_time: float = 0.0

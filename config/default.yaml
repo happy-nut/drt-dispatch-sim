@@ -1,0 +1,55 @@
+# DRT 분산 합승 배차 엔진 — 기본 설정
+# 운영지역: 세종시 도심 (10km 정사각), H3 res 7
+seed: 42
+duration: 1800.0          # 가상 30분
+real_time_factor: 30.0    # 대시보드 배속(가상1초 = wall 1/30초)
+motion_dt: 1.0
+
+area:
+  name: 세종시
+  center_lat: 36.48
+  center_lon: 127.28
+  size_km: 10.0
+  h3_resolution: 7
+
+demand:
+  arrival_rate_per_hour: 360.0
+  max_wait: 420.0
+  max_detour_factor: 1.6
+  # 시간대 가중치(러시아워 곡선) — duration 에 비례 보간
+  hourly_profile: [0.5, 0.7, 1.0, 1.4, 1.2, 0.9, 1.3, 1.6, 1.1, 0.7]
+  # 핫스팟 (x_km, y_km, weight)
+  hotspots:
+    - [3.0, 3.0, 3.0]
+    - [7.0, 6.5, 2.5]
+    - [5.0, 8.0, 1.5]
+
+fleet:
+  vehicles: 36
+  capacity: 4
+
+cluster:
+  workers: 3
+  coordinators: 2
+  heartbeat_interval: 2.0
+  heartbeat_timeout: 6.0
+  lease_ttl: 5.0
+  lease_renew: 2.0
+  worker_tick: 0.5
+  throughput_per_tick: 6
+  queue_high_water: 25
+
+bus:
+  backend: sim
+  base_latency: 0.04
+  jitter: 0.06
+  loss_prob: 0.0
+  dup_prob: 0.02          # at-least-once(중복 전달) 시연
+
+dispatch:
+  engine: insertion
+  virtual_stops: true
+  stop_spacing_km: 0.5
+  max_walk_km: 0.4
+
+faults: []

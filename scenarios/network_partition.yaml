@@ -1,0 +1,13 @@
+# 네트워크 파티션 → 격리 노드 장애 인지 → 리밸런싱 → 해제 후 재가입
+seed: 5
+duration: 600.0
+real_time_factor: 20.0
+area: {name: 세종시, center_lat: 36.48, center_lon: 127.28, size_km: 10.0, h3_resolution: 7}
+demand: {arrival_rate_per_hour: 360.0, max_wait: 420.0}
+fleet: {vehicles: 32, capacity: 4}
+cluster: {workers: 4, coordinators: 2, heartbeat_timeout: 6.0}
+bus: {backend: sim}
+dispatch: {engine: insertion, virtual_stops: true}
+faults:
+  - {at: 120.0, kind: partition, nodes: [worker-2]}
+  - {at: 360.0, kind: heal_partition}

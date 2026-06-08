@@ -16,3 +16,9 @@ htmlcov/
 .DS_Store
 .idea/
 .vscode/
+
+# 에디터/도구 설정
+.claude/
+.omc/
+# 시뮬레이션 산출물
+assets/*.gif

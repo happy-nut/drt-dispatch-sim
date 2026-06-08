@@ -1,0 +1,9 @@
+seed: 5
+duration: 1800.0
+real_time_factor: 30.0
+area: {name: 세종시, center_lat: 36.48, center_lon: 127.28, size_km: 10.0, h3_resolution: 7}
+demand: {arrival_rate_per_hour: 600.0, max_wait: 360.0, max_detour_factor: 1.6}
+fleet: {vehicles: 14, capacity: 4}
+cluster: {workers: 4, coordinators: 2}
+bus: {backend: sim, dup_prob: 0.02}
+dispatch: {engine: insertion, virtual_stops: true, idle_rebalancing: true}

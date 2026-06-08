@@ -1,0 +1,13 @@
+# 코디네이터(리더) 장애 → 리더 재선출(페일오버) 시연
+seed: 3
+duration: 500.0
+real_time_factor: 20.0
+area: {name: 세종시, center_lat: 36.48, center_lon: 127.28, size_km: 10.0, h3_resolution: 7}
+demand: {arrival_rate_per_hour: 360.0, max_wait: 420.0}
+fleet: {vehicles: 30, capacity: 4}
+cluster: {workers: 3, coordinators: 3, lease_ttl: 5.0, lease_renew: 2.0}
+bus: {backend: sim}
+dispatch: {engine: insertion, virtual_stops: true}
+faults:
+  - {at: 120.0, kind: kill_leader}
+  - {at: 300.0, kind: kill_leader}
