@@ -22,3 +22,6 @@ htmlcov/
 .omc/
 # 시뮬레이션 산출물
 assets/*.gif
+
+# osmnx HTTP 캐시(graphml 저장본이 산출물)
+cache/

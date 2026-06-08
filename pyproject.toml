@@ -23,6 +23,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest==9.0.3", "fakeredis==2.36.1", "ruff"]
 redis = ["redis==8.0.0"]   # cluster 모드(실제 별도 프로세스) 전용
+osm = ["osmnx==2.1.0", "scikit-learn"]  # 실제 도로망 라우팅(없으면 직선 폴백)
 
 [project.scripts]
 drt-sim = "drt_sim.cli:main"

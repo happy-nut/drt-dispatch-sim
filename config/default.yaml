@@ -52,4 +52,10 @@ dispatch:
   stop_spacing_km: 0.5
   max_walk_km: 0.4
 
+# 차량 이동 형상: 실제 도로(osm) 또는 직선(straight). 통행시간은 엔진 유클리드 유지.
+# osm 은 data/sejong_drive.graphml 필요(없으면 자동으로 직선 폴백).
+routing:
+  backend: osm
+  graph_path: data/sejong_drive.graphml
+
 faults: []

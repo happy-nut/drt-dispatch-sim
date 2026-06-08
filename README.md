@@ -102,6 +102,7 @@ src/drt_sim/
   world.py         # 차량 물리(이동·픽업/하차)
   dispatch/        # insertion(합승) + virtual_stop(가상정류장) + baseline(비합승)
   geo.py           # 평면 km 좌표 + 위경도 투영 + H3
+  routing.py       # 도로망 라우터(StraightRouter / OSMRouter) — 이동 형상
   demand.py        # 시변 포아송 + 핫스팟 수요 생성기
   protocol.py      # 노드 간 메시지 페이로드
   config.py        # pydantic 설정 + YAML 로더
@@ -183,7 +184,20 @@ dedupe 하여 같은 요청을 두 번 배차하지 않는다.
 - **검증**: 충분 공급(36대)에서는 결과가 켜짐/꺼짐 동일(무동작), 공급 부족(16대·5워커
   단편화)에서는 여러 시드 평균 매칭률↑·거절↓. VKT 는 선이동만큼 증가하는 트레이드오프.
 
-### 9. 지도 렌더링: 실제 타일맵 기본 + SVG 폴백
+### 9. 도로망 라우팅: 형상만 도로, 시간은 유클리드
+차량이 정류점 사이를 직선으로 가로지르면 실제 지도 위에서 어색하다. 그래서 **차량의
+이동 경로 형상은 실제 OSM 도로(OSMnx 최단경로)를 따라간다**. 단, 도착 시각은 엔진이
+가정한 **유클리드 통행시간**에 맞춘다(폴리라인 호 길이 기준 보간).
+- **왜 이렇게**: 스펙이 "라우팅 최적성에 과투자 금지"라 했다. 배차 엔진은 빠른·결정론적
+  유클리드 통행시간을 유지하고, 시각화 형상만 도로를 따르게 분리했다. `StraightRouter`
+  면 직선 모드와 **바이트 단위로 동일**(결정성 테스트 통과).
+- **트레이드오프**: 도로 라우팅은 시각화용이라 배차 의사결정엔 반영되지 않는다. OSM
+  통행시간을 엔진에 넣으면 더 정확하지만 인서션 후보마다 최단경로 계산 → 느리고
+  비결정론적이라 의도적으로 분리했다. `routing.backend: straight` 로 끄면 의존성 0.
+- **폴백**: osmnx 미설치/그래프 없으면 자동으로 직선. 도로 그래프는 `data/` 에 동봉,
+  다른 운영지역은 `area.center_lat/lon` 변경 후 `build-graph` 로 재생성.
+
+### 10. 지도 렌더링: 실제 타일맵 기본 + SVG 폴백
 기본은 **실제 도로 타일맵(`go.Scattermap`, MapLibre, 토큰 불필요)** 위에 H3 샤드·차량·
 경로를 얹는다. 세종시 실제 지리 위에서 지오 샤딩이 보여 평가자에게 가장 직관적이다.
 - **폴백**: `config.area.map_style: svg` 로 두면 외부 타일·WebGL 없이 평면 km **SVG
@@ -197,7 +211,10 @@ dedupe 하여 같은 요청을 두 번 배차하지 않는다.
 ```bash
 # 설치
 python -m venv .venv && source .venv/bin/activate
-pip install -e .            # cluster 모드까지: pip install -e ".[redis,dev]"
+pip install -e .            # 전체: pip install -e ".[redis,osm,dev]"
+# 실제 도로망 라우팅을 쓰려면 [osm] 설치 후(미설치 시 자동으로 직선 폴백):
+#   pip install -e ".[osm]"
+#   python -m drt_sim.cli build-graph   # 운영지역 도로 그래프 캐시(저장본 동봉, 재생성용)
 
 # 1) 대시보드 (단일 커맨드 데모)
 python -m drt_sim.cli dashboard --config config/default.yaml
@@ -302,8 +319,9 @@ python -m drt_sim.cli cluster --mode redis --workers 3 --kill-at 4
 
 ## 한계 & 다음 단계
 
-- **라우팅은 직선거리 근사** — OSRM/도로망 행렬로 교체 지점을 `geo.py` 에 격리해 두었다
-  (요구사항상 라우팅 최적성은 비핵심).
+- **배차 통행시간은 직선거리 근사** — 차량 이동 *형상*은 실제 OSM 도로를 따르지만(`routing.py`),
+  배차 *의사결정*의 통행시간은 결정론·속도를 위해 유클리드를 유지한다(의도적). OSM/OSRM
+  통행시간을 엔진에 넣는 것이 다음 단계(인서션 후보별 최단경로 캐싱 필요).
 - **리더 선출은 lease 단순화** — sim 모드는 인메모리 lease, redis 모드는 Redis 키 lease.
   강한 일관성이 필요하면 Raft 로그 복제로 확장.
 - **redis 모드의 데이터 플레인** — 현재 redis 멀티프로세스 모드는 제어 플레인(리더 선출·

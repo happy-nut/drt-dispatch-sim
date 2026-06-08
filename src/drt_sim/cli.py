@@ -65,6 +65,29 @@ def cmd_baseline(args) -> int:
     return 0
 
 
+def cmd_build_graph(args) -> int:
+    """운영지역 OSM 도로 그래프를 내려받아 graphml 로 캐시(osm 라우팅용)."""
+    cfg = _load(args)
+    try:
+        import osmnx as ox
+    except ImportError:
+        print("osmnx 가 필요합니다: pip install '.[osm]'")
+        return 1
+    import os
+
+    dist = int(cfg.area.size_km * 1000 * 0.75)
+    print(f"OSM 도로망 다운로드: 중심({cfg.area.center_lat},{cfg.area.center_lon}) "
+          f"반경 {dist}m … (네트워크 필요)")
+    g = ox.graph_from_point((cfg.area.center_lat, cfg.area.center_lon),
+                            dist=dist, network_type="drive", simplify=True)
+    out = cfg.routing.graph_path
+    os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
+    ox.save_graphml(g, out)
+    print(f"✔ 저장: {out} ({len(g.nodes)} 노드 / {len(g.edges)} 엣지, "
+          f"{os.path.getsize(out) / 1e6:.1f}MB)")
+    return 0
+
+
 def cmd_cluster(args) -> int:
     if args.mode == "redis":
         from .cluster_redis import launch_redis_cluster
@@ -129,6 +152,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     add_common(sp)
     sp.add_argument("--workers", type=str, default="1,2,4,6")
     sp.set_defaults(func=cmd_scaling)
+
+    sp = sub.add_parser("build-graph", help="OSM 도로 그래프 다운로드·캐시(osm 라우팅용)")
+    add_common(sp)
+    sp.set_defaults(func=cmd_build_graph)
 
     sp = sub.add_parser("cluster", help="진짜 분산: live(asyncio) 또는 redis(멀티프로세스)")
     add_common(sp)

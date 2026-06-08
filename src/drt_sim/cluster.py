@@ -20,6 +20,7 @@ from .gateway import Gateway
 from .geo import GeoProjection, Point
 from .live_metrics import LiveMetrics, MetricsActor
 from .models import Request, RequestStatus, Vehicle
+from .routing import load_router
 from .sharding import build_shard_map, gini
 from .sim_clock import Runtime
 from .store import VehicleStore
@@ -54,6 +55,8 @@ class ClusterController:
             config.area.size_km, config.area.h3_resolution,
         )
         self.all_cells = self.proj.cells_covering_area()
+        # 도로망 라우터(차량 이동 형상; 통행시간은 엔진 유클리드 유지). 실패 시 직선 폴백.
+        self.router = load_router(config.routing.backend, self.proj, config.routing.graph_path)
         # 셀 중심의 평면 km 좌표(유휴 리밸런싱 선이동 목적지)
         self.cell_centers: Dict[str, Point] = {
             c: Point(*self.proj.to_km(*self.proj.cell_center_latlon(c)))
@@ -153,7 +156,7 @@ class ClusterController:
         self.runtime.spawn("gateway", gateway.run)
 
         world = World(self.bus, self.store, self.registry, self.tracer,
-                      motion_dt=self.config.motion_dt)
+                      motion_dt=self.config.motion_dt, router=self.router)
         self.runtime.spawn("world", world.run)
 
         metrics_actor = MetricsActor("metrics", self.bus, self.metrics)
@@ -291,7 +294,13 @@ def build_snapshot(ctrl: ClusterController) -> dict:
     # 차량 (평면 km 좌표 — SVG 카토그래픽 렌더용)
     vehicles = []
     for v in ctrl.store.all_vehicles():
-        route_km = [(s.location.x, s.location.y) for s in v.route]
+        # 표시용 경로를 도로 형상으로(직선 라우터면 정류점 직선과 동일). 라우터 캐시로 저렴.
+        route_km: list = []
+        prev = v.location
+        for s in v.route:
+            for p in ctrl.router.path_km(prev, s.location)[1:]:
+                route_km.append((p.x, p.y))
+            prev = s.location
         repo = ([v.reposition_target.x, v.reposition_target.y]
                 if v.reposition_target is not None else None)
         vehicles.append({

@@ -80,6 +80,13 @@ class FaultEvent(BaseModel):
     factor: float = 1.0              # demand_surge 배율
 
 
+class RoutingConfig(BaseModel):
+    """도로망 라우팅(차량 이동 경로 형상). 통행시간은 엔진의 유클리드 근사 유지."""
+
+    backend: Literal["straight", "osm"] = "straight"
+    graph_path: str = "data/sejong_drive.graphml"
+
+
 class DispatchConfig(BaseModel):
     engine: Literal["insertion", "baseline"] = "insertion"
     virtual_stops: bool = True
@@ -105,6 +112,7 @@ class SimConfig(BaseModel):
     cluster: ClusterConfig = Field(default_factory=ClusterConfig)
     bus: BusConfig = Field(default_factory=BusConfig)
     dispatch: DispatchConfig = Field(default_factory=DispatchConfig)
+    routing: RoutingConfig = Field(default_factory=RoutingConfig)
     faults: List[FaultEvent] = Field(default_factory=list)
 
     @classmethod
