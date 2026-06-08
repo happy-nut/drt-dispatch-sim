@@ -21,9 +21,10 @@ class AreaConfig(BaseModel):
     center_lon: float = 127.28
     size_km: float = 10.0
     h3_resolution: int = 7
-    # 지도 베이스 스타일. "white-bg" 는 외부 타일이 필요 없어 오프라인에서도 항상
-    # 렌더된다(기본). 온라인이라면 "carto-positron"/"open-street-map" 로 도로 타일 표시.
-    map_style: str = "white-bg"
+    # 지도 베이스 스타일.
+    #   "carto-positron"/"open-street-map" 등 → 실제 도로 타일맵(maplibre) 위에 H3 샤드 표시(기본).
+    #   "svg" → 외부 타일/WebGL 불필요한 벌집 스키매틱(오프라인·저사양·스크린샷 폴백).
+    map_style: str = "carto-positron"
 
 
 class DemandConfig(BaseModel):

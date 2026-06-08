@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Dict, List
 
 import plotly.graph_objects as go
@@ -38,16 +39,115 @@ def _hex_to_rgba(hex_color: str, alpha: float) -> str:
 
 
 def build_map_figure(snap: dict, center_lat: float, center_lon: float,
-                     map_style: str = "white-bg") -> go.Figure:
-    """지도 패널: H3 셀(소유 노드색) + 차량 + 경로.
+                     map_style: str = "carto-positron") -> go.Figure:
+    """지도 패널 디스패처.
 
-    외부 타일/​WebGL 에 의존하지 않도록 평면 km 좌표 위의 SVG(go.Scatter)로 그린다.
-    오프라인·저사양 환경에서도 항상 렌더되고 스크린샷/GIF 캡처가 가능하다.
-    H3 셀은 실제 지오 셀을 km 로 역투영한 것이라 모양/소유권이 그대로 보인다.
+    - ``map_style == "svg"`` → 외부 타일/WebGL 불필요한 벌집 스키매틱(오프라인·폴백).
+    - 그 외(``carto-positron``/``open-street-map`` 등) → **실제 도로 타일맵(maplibre)**
+      위에 H3 샤드·차량·경로를 얹는다(기본).
     """
+    if map_style == "svg":
+        return _build_map_svg(snap)
+    return _build_map_tiled(snap, center_lat, center_lon, map_style)
+
+
+def _km_to_latlon(x: float, y: float, clat: float, clon: float, area: float) -> tuple:
+    half = area / 2.0
+    lat = clat + (y - half) / 111.0
+    lon = clon + (x - half) / (111.0 * math.cos(math.radians(clat)))
+    return lat, lon
+
+
+def _build_map_tiled(snap: dict, clat: float, clon: float, map_style: str) -> go.Figure:
+    """실제 도로 타일맵(maplibre, 토큰 불필요) 위에 H3 샤드 오버레이."""
+    area = snap.get("area_km", 10.0)
     fig = go.Figure()
 
     # 1) H3 셀 — 소유 노드별로 묶어 None 구분자로 채움(폴리곤 fill)
+    by_owner: Dict[str, Dict[str, list]] = {}
+    for c in snap["cells"]:
+        owner = c["owner"] or "?"
+        bucket = by_owner.setdefault(owner, {"lat": [], "lon": []})
+        pts = [_km_to_latlon(x, y, clat, clon, area) for x, y in c["boundary_km"]]
+        for lat, lon in pts:
+            bucket["lat"].append(lat)
+            bucket["lon"].append(lon)
+        bucket["lat"].append(pts[0][0])
+        bucket["lon"].append(pts[0][1])
+        bucket["lat"].append(None)
+        bucket["lon"].append(None)
+    for owner, b in by_owner.items():
+        col = node_color(owner)
+        fig.add_trace(go.Scattermap(
+            lat=b["lat"], lon=b["lon"], mode="lines",
+            fill="toself", fillcolor=_hex_to_rgba(col, 0.30),
+            line=dict(color=_hex_to_rgba(col, 0.9), width=1),
+            name=f"샤드 {owner}", hoverinfo="name",
+        ))
+
+    # 2) 차량 경로
+    rlat: list = []
+    rlon: list = []
+    for v in snap["vehicles"]:
+        if not v["route_km"]:
+            continue
+        seq = [(v["x"], v["y"])] + list(v["route_km"])
+        for x, y in seq:
+            lat, lon = _km_to_latlon(x, y, clat, clon, area)
+            rlat.append(lat)
+            rlon.append(lon)
+        rlat.append(None)
+        rlon.append(None)
+    if rlat:
+        fig.add_trace(go.Scattermap(
+            lat=rlat, lon=rlon, mode="lines",
+            line=dict(color="rgba(40,40,40,0.45)", width=1.2),
+            name="경로", hoverinfo="skip", showlegend=False,
+        ))
+
+    # 2b) 유휴 리밸런싱 선이동(점선은 maplibre 미지원 → 가는 실선)
+    dlat: list = []
+    dlon: list = []
+    for v in snap["vehicles"]:
+        if v.get("repo"):
+            a = _km_to_latlon(v["x"], v["y"], clat, clon, area)
+            b = _km_to_latlon(v["repo"][0], v["repo"][1], clat, clon, area)
+            dlat += [a[0], b[0], None]
+            dlon += [a[1], b[1], None]
+    if dlat:
+        fig.add_trace(go.Scattermap(
+            lat=dlat, lon=dlon, mode="lines",
+            line=dict(color="rgba(30,120,200,0.7)", width=2),
+            name="유휴 리밸런싱", hoverinfo="skip", showlegend=False,
+        ))
+
+    # 3) 차량
+    vlat, vlon = [], []
+    for v in snap["vehicles"]:
+        lat, lon = _km_to_latlon(v["x"], v["y"], clat, clon, area)
+        vlat.append(lat)
+        vlon.append(lon)
+    vcol = [node_color(v["owner"]) for v in snap["vehicles"]]
+    vsize = [11 + 3 * v["onboard"] for v in snap["vehicles"]]
+    vtext = [f"veh#{v['id']} owner={v['owner']} onboard={v['onboard']} stops={v['stops']}"
+             for v in snap["vehicles"]]
+    fig.add_trace(go.Scattermap(
+        lat=vlat, lon=vlon, mode="markers",
+        marker=dict(size=vsize, color=vcol),
+        name="차량", text=vtext, hoverinfo="text", showlegend=False,
+    ))
+
+    fig.update_layout(
+        map=dict(style=map_style, center=dict(lat=clat, lon=clon), zoom=11.3),
+        margin=dict(l=0, r=0, t=0, b=0), autosize=True, showlegend=False,
+        uirevision="map",
+    )
+    return fig
+
+
+def _build_map_svg(snap: dict) -> go.Figure:
+    """오프라인 폴백: 외부 타일/WebGL 불필요한 평면 km SVG 벌집."""
+    fig = go.Figure()
     by_owner: Dict[str, Dict[str, list]] = {}
     for c in snap["cells"]:
         owner = c["owner"] or "?"
@@ -60,7 +160,6 @@ def build_map_figure(snap: dict, center_lat: float, center_lon: float,
         bucket["y"].append(first[1])
         bucket["x"].append(None)
         bucket["y"].append(None)
-
     for owner, pts in by_owner.items():
         col = node_color(owner)
         fig.add_trace(go.Scatter(
@@ -70,7 +169,6 @@ def build_map_figure(snap: dict, center_lat: float, center_lon: float,
             name=f"샤드 {owner}", hoverinfo="name",
         ))
 
-    # 2) 차량 경로(얇은 선)
     rx: list = []
     ry: list = []
     for v in snap["vehicles"]:
@@ -90,7 +188,6 @@ def build_map_figure(snap: dict, center_lat: float, center_lon: float,
             name="경로", hoverinfo="skip", showlegend=False,
         ))
 
-    # 2b) 유휴 리밸런싱 선이동(점선) — 수요 핫셀로의 deadhead
     dx: list = []
     dy: list = []
     for v in snap["vehicles"]:
@@ -104,7 +201,6 @@ def build_map_figure(snap: dict, center_lat: float, center_lon: float,
             name="유휴 리밸런싱", hoverinfo="skip", showlegend=False,
         ))
 
-    # 3) 차량 (소유 노드색, 탑승 인원에 따라 크기/링)
     vx = [v["x"] for v in snap["vehicles"]]
     vy = [v["y"] for v in snap["vehicles"]]
     vcol = [node_color(v["owner"]) for v in snap["vehicles"]]
@@ -123,8 +219,7 @@ def build_map_figure(snap: dict, center_lat: float, center_lon: float,
         plot_bgcolor="#f7f7f5", paper_bgcolor="#fff",
         xaxis=dict(visible=False, range=[-0.5, area + 0.5], constrain="domain"),
         yaxis=dict(visible=False, range=[-0.5, area + 0.5],
-                   scaleanchor="x", scaleratio=1),  # 등축 → 헥사곤 왜곡 없음
-        # uirevision 미설정: 매 프레임 autosize 재계산(flex 폭 0 race 로 인한 축소 방지)
+                   scaleanchor="x", scaleratio=1),
     )
     return fig
 
