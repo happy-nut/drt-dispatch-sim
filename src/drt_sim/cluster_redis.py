@@ -184,16 +184,16 @@ def launch_redis_cluster(
         worker_procs[wid] = p
         procs.append(p)
 
-    print(f"▶ 실제 OS 프로세스 {len(procs)}개 기동 (coord {coordinators}, worker {workers})")
+    print(f"실제 OS 프로세스 {len(procs)}개 기동 (coord {coordinators}, worker {workers})")
     for p in procs:
         p.start()
 
     if kill_worker_at is not None and worker_ids:
         time.sleep(kill_worker_at)
         victim = worker_ids[-1]
-        print(f"💀 {victim} 프로세스(pid={worker_procs[victim].pid}) 강제 종료 → 장애 감지 유도")
+        print(f"[kill] {victim} 프로세스(pid={worker_procs[victim].pid}) 강제 종료 → 장애 감지 유도")
         worker_procs[victim].terminate()
 
     for p in procs:
         p.join()
-    print("✔ 클러스터 종료. 코디네이터 로그에서 리더 선출과 장애 감지를 확인하세요.")
+    print("클러스터 종료. 코디네이터 로그에서 리더 선출과 장애 감지를 확인하세요.")

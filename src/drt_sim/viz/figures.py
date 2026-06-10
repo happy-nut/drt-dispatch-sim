@@ -317,9 +317,9 @@ def build_topology_elements(snap: dict) -> List[dict]:
             status = n["role"]
         label = n["id"]
         if n["role"] == "worker":
-            label += f"\nq={n['queue_depth']} ✓{n['processed']}"
+            label += f"\nq={n['queue_depth']} 처리{n['processed']}"
         elif is_leader:
-            label += " ★"
+            label += " (리더)"
         elements.append({
             "data": {"id": n["id"], "label": label, "status": status,
                      "color": node_color(n["id"])},

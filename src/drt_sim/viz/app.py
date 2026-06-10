@@ -73,7 +73,7 @@ def create_app(config: SimConfig) -> dash.Dash:
 
         # 헤더 + 메트릭 배지
         html.Div([
-            html.Div("🚐 실시간 수요응답형 합승 배차 엔진 — 분산 클러스터",
+            html.Div("실시간 수요응답형 합승 배차 엔진 — 분산 클러스터",
                      style={"fontSize": "18px", "fontWeight": "bold", "color": "#fff",
                             "padding": "8px 16px"}),
             html.Div([
@@ -92,7 +92,7 @@ def create_app(config: SimConfig) -> dash.Dash:
 
         # 컨트롤 바
         html.Div([
-            html.Button("⏸ 일시정지", id="btn-play", n_clicks=0, style={"marginRight": "8px"}),
+            html.Button("일시정지", id="btn-play", n_clicks=0, style={"marginRight": "8px"}),
             html.Span("배속", style={"fontSize": "11px", "margin": "0 4px"}),
             html.Div(dcc.Slider(id="speed", min=0.25, max=8, step=0.25, value=1.0,
                                 marks={1: "1x", 4: "4x", 8: "8x"}),
@@ -103,15 +103,15 @@ def create_app(config: SimConfig) -> dash.Dash:
                          clearable=False,
                          style={"width": "130px", "display": "inline-block",
                                 "verticalAlign": "middle", "fontSize": "12px"}),
-            html.Button("💀 워커 장애", id="btn-kill-worker", n_clicks=0,
+            html.Button("워커 장애", id="btn-kill-worker", n_clicks=0,
                         style={"margin": "0 4px"}),
-            html.Button("👑 리더 장애", id="btn-kill-leader", n_clicks=0,
+            html.Button("리더 장애", id="btn-kill-leader", n_clicks=0,
                         style={"margin": "0 4px"}),
-            html.Button("📈 수요 폭증", id="btn-surge", n_clicks=0, style={"margin": "0 4px"}),
-            html.Button("✂ 파티션(worker-0)", id="btn-partition", n_clicks=0,
+            html.Button("수요 폭증", id="btn-surge", n_clicks=0, style={"margin": "0 4px"}),
+            html.Button("파티션(worker-0)", id="btn-partition", n_clicks=0,
                         style={"margin": "0 4px"}),
-            html.Button("🔗 파티션 해제", id="btn-heal", n_clicks=0, style={"margin": "0 4px"}),
-            html.Button("➕ 워커 추가", id="btn-add", n_clicks=0, style={"margin": "0 4px"}),
+            html.Button("파티션 해제", id="btn-heal", n_clicks=0, style={"margin": "0 4px"}),
+            html.Button("워커 추가", id="btn-add", n_clicks=0, style={"margin": "0 4px"}),
         ], style={"padding": "8px 16px", "backgroundColor": "#f1f3f4",
                   "display": "flex", "alignItems": "center"}),
 
@@ -126,7 +126,7 @@ def create_app(config: SimConfig) -> dash.Dash:
 
             html.Div([
                 html.Div([
-                    html.Div("클러스터 토폴로지 (★=리더, 빨강=과부하/장애)",
+                    html.Div("클러스터 토폴로지 (금색 테두리=리더, 빨강=과부하/장애)",
                              style={"fontSize": "12px", "fontWeight": "bold"}),
                     cyto.Cytoscape(
                         id="topology", layout={"name": "preset", "fit": False},
@@ -206,7 +206,7 @@ def _register_callbacks(app: dash.Dash, runner: SimRunner, config: SimConfig) ->
     def _toggle_play(n):
         playing = (n % 2) == 0
         runner.set_playing(playing)
-        return "⏸ 일시정지" if playing else "▶ 재생"
+        return "일시정지" if playing else "재생"
 
     # 모든 컨트롤을 하나의 콜백으로 통합(triggered_id 로 분기) — 출력 중복 회피.
     @app.callback(

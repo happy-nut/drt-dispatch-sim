@@ -37,7 +37,7 @@ def cmd_dashboard(args) -> int:
 
     cfg = _load(args)
     app = create_app(cfg)
-    print(f"▶ 대시보드: http://{args.host}:{args.port}  (시드 {cfg.seed}, "
+    print(f"대시보드: http://{args.host}:{args.port}  (시드 {cfg.seed}, "
           f"워커 {cfg.cluster.workers}, 차량 {cfg.fleet.vehicles})")
     app.run(host=args.host, port=args.port, debug=False)
     return 0
@@ -100,7 +100,7 @@ def cmd_build_graph(args) -> int:
     out = cfg.routing.graph_path
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     ox.save_graphml(g, out)
-    print(f"✔ 저장: {out} ({len(g.nodes)} 노드 / {len(g.edges)} 엣지, "
+    print(f"저장: {out} ({len(g.nodes)} 노드 / {len(g.edges)} 엣지, "
           f"{os.path.getsize(out) / 1e6:.1f}MB)")
     return 0
 
@@ -121,7 +121,7 @@ def cmd_cluster(args) -> int:
     cfg = _load(args)
     cfg.cluster.workers = args.workers
     cfg.cluster.coordinators = args.coordinators
-    print(f"▶ live(asyncio) 클러스터 — 같은 actor 가 진짜 asyncio 루프에서 실행 "
+    print(f"live(asyncio) 클러스터 — 같은 actor 가 진짜 asyncio 루프에서 실행 "
           f"(배속 {args.scale}x, 가상 {args.virtual_seconds:.0f}s)\n")
     ctrl = run_live(cfg, virtual_seconds=args.virtual_seconds, time_scale=args.scale)
     print(summarize(ctrl))
