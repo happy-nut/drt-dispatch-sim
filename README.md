@@ -204,6 +204,19 @@ dedupe 하여 같은 요청을 두 번 배차하지 않는다.
   벌집**으로 그린다. 오프라인·저사양·CI 스크린샷 환경에서도 항상 렌더된다.
 - 두 렌더러는 같은 스냅샷(km 좌표)을 쓰고, 타일맵은 km 를 위경도로 역투영해 표시한다.
 
+### 11. 합승 균형: 운영자 목적 + 전(全) 승객 보호 제약 (다목적)
+합승은 **승객(직선에 가깝게)과 운영자(많이 태워 VKT↓)의 이해가 충돌**하는 다목적
+문제다. 단일 최적점이 아니라 **파레토 곡선**이라, "목적 + 제약"으로 분리해 푼다.
+- **목적함수 = 운영자 효율**: 삽입 시 추가 차량 주행시간(한계비용) 최소 → 합승 선호.
+- **제약 = 승객 보호**: `max_wait`(대기 상한) + `max_detour_factor`(우회 상한) + 정원.
+  `_feasible` 은 **경로 위 모든 승객**(새 요청뿐 아니라 이미 탔거나 배차된 승객까지)의
+  대기·우회를 재검증한다 — 새 손님을 끼우려고 **기존 손님을 한도 넘게 돌리지 못한다**
+  (이미 탑승한 승객은 `boarded_at`, 미탑승 승객은 경로상 픽업 시각으로 우회 계산).
+- **균형점 선택 = 파레토 스윕**: `cli pareto` 로 `max_detour_factor` 를 1.1→2.0 스윕하면
+  "허용 한도↑ → 매칭률·합승률↑, VKT↓, 단 승객 우회↑" 곡선이 나온다. **발견**: 한도를
+  풀어도 *실제* 평균 우회는 1.0~1.1x 에 머문다 — 한도는 합승 *성사*를 가능케 하는 빗장일
+  뿐, 대부분의 합승은 거의 안 돌아간다. 보합점(knee)은 ~1.5x.
+
 ---
 
 ## 실행법
@@ -228,6 +241,10 @@ python -m drt_sim.cli baseline --config config/default.yaml --duration 1200
 
 # 4) 확장성 실험(워커 수)
 python -m drt_sim.cli scaling --config config/default.yaml --workers 1,2,4,6
+
+# 4b) 승객 우회 ↔ 운영 효율 파레토 곡선(허용 우회 한도 스윕)
+python -m drt_sim.cli pareto --config config/default.yaml --duration 1200 \
+    --factors 1.1,1.3,1.5,1.7,2.0 --html pareto.html
 
 # 5) 진짜 분산 — live(asyncio) 모드: 같은 actor 가 실제 asyncio 루프에서 실행(redis 불필요)
 python -m drt_sim.cli cluster --mode live --scale 20 --virtual-seconds 60
@@ -311,9 +328,10 @@ python -m drt_sim.cli cluster --mode redis --workers 3 --kill-at 4
 - `test_async_runtime.py` — AsyncioRuntime 동작 + **live 클러스터가 진짜 asyncio 에서 실행**
 - `test_redis_cluster.py` — Redis lease 리더 선출·만료 페일오버, Streams 라운드트립,
   **프로세스 간 장애 감지**(공유 fakeredis + 스레드)
-- `test_engine.py` — 배차 제약(정원·대기·픽업선행)
+- `test_engine.py` — 배차 제약(정원·대기·픽업선행), **전 승객 우회 보호**(삽입이 기존/
+  탑승 승객을 한도 넘게 돌리면 거부)
 
-총 31개 테스트, redis-server 없이 모두 실행된다.
+총 33개 테스트, redis-server 없이 모두 실행된다.
 
 ---
 

@@ -30,9 +30,15 @@ class NearestIdleEngine:
                 best = v
         if best is None:
             return None
+        meta = dict(
+            request_time=request.request_time,
+            max_wait=request.max_wait,
+            direct_time=request.direct_travel_time(),
+            max_detour=request.max_detour_factor,
+        )
         route = [
-            RouteStop(request.id, StopType.PICKUP, request.origin, request.party_size),
-            RouteStop(request.id, StopType.DROPOFF, request.destination, request.party_size),
+            RouteStop(request.id, StopType.PICKUP, request.origin, request.party_size, **meta),
+            RouteStop(request.id, StopType.DROPOFF, request.destination, request.party_size, **meta),
         ]
         return InsertionPlan(
             vehicle_id=best.id,

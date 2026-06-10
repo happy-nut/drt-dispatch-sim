@@ -113,6 +113,43 @@ def compare_baseline(config: SimConfig) -> List[RunResult]:
     ]
 
 
+def pareto_detour_sweep(config: SimConfig, factors: List[float]) -> List[RunResult]:
+    """``max_detour_factor`` 를 스윕하며 승객 우회 vs 운영 효율의 파레토 곡선을 만든다.
+
+    한도를 키우면(허용 우회↑) 더 많이 합쳐져 VKT·거절은 줄지만 승객 평균 우회는 늘어난다.
+    그 트레이드오프 곡선을 한 번에 본다.
+    """
+    results = []
+    for f in factors:
+        cfg = config.model_copy(deep=True)
+        cfg.demand.max_detour_factor = f
+        results.append(run_once(cfg, f"detour≤{f:.2f}x"))
+    return results
+
+
+def write_pareto_html(results: List[RunResult], path: str) -> None:
+    """스윕 결과를 파레토 곡선 HTML 로 저장(승객 우회 vs 운영 VKT, 색=매칭률)."""
+    import plotly.graph_objects as go
+
+    xs = [r.avg_detour_ratio for r in results]
+    ys = [r.total_vkt_km for r in results]
+    labels = [r.label for r in results]
+    match = [r.match_rate * 100 for r in results]
+    fig = go.Figure(go.Scatter(
+        x=xs, y=ys, mode="lines+markers+text", text=labels, textposition="top center",
+        marker=dict(size=14, color=match, colorscale="RdYlGn", cmin=0, cmax=100,
+                    colorbar=dict(title="매칭률 %"), line=dict(color="#333", width=1)),
+        line=dict(color="rgba(0,0,0,0.3)"),
+    ))
+    fig.update_layout(
+        title="승객 우회 ↔ 운영 효율 파레토 곡선 (점 = 허용 우회 한도)",
+        xaxis_title="승객 평균 실제 우회 배율 (작을수록 승객 유리)",
+        yaxis_title="총 주행거리 VKT km (작을수록 운영 유리)",
+        template="plotly_white", width=820, height=520,
+    )
+    fig.write_html(path, include_plotlyjs="cdn")
+
+
 def scaling_experiment(config: SimConfig, worker_counts: List[int]) -> List[RunResult]:
     """워커 수를 늘리며 throughput/지연 변화 측정(고정 부하)."""
     results = []

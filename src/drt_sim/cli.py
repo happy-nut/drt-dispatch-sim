@@ -65,6 +65,23 @@ def cmd_baseline(args) -> int:
     return 0
 
 
+def cmd_pareto(args) -> int:
+    from .experiments import pareto_detour_sweep, write_pareto_html
+
+    cfg = _load(args)
+    factors = [float(x) for x in args.factors.split(",")]
+    print(f"=== 파레토 스윕: 허용 우회 한도 {factors} (승객 우회 ↔ 운영 효율) ===\n")
+    print(f"{'한도':>8} {'매칭률':>7} {'합승률':>7} {'평균우회':>8} {'평균대기':>8} {'VKT(km)':>9}")
+    results = pareto_detour_sweep(cfg, factors)
+    for r in results:
+        print(f"{r.label:>8} {r.match_rate:>6.0%} {r.pooling_rate:>6.0%} "
+              f"{r.avg_detour_ratio:>7.2f}x {r.avg_wait:>6.0f}s {r.total_vkt_km:>9.1f}")
+    if args.html:
+        write_pareto_html(results, args.html)
+        print(f"\n곡선 저장: {args.html} (브라우저로 열어 보세요)")
+    return 0
+
+
 def cmd_build_graph(args) -> int:
     """운영지역 OSM 도로 그래프를 내려받아 graphml 로 캐시(osm 라우팅용)."""
     cfg = _load(args)
@@ -152,6 +169,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     add_common(sp)
     sp.add_argument("--workers", type=str, default="1,2,4,6")
     sp.set_defaults(func=cmd_scaling)
+
+    sp = sub.add_parser("pareto", help="승객 우회↔운영효율 파레토 스윕(max_detour_factor)")
+    add_common(sp)
+    sp.add_argument("--factors", type=str, default="1.1,1.3,1.5,1.7,2.0")
+    sp.add_argument("--html", type=str, default=None, help="파레토 곡선 HTML 저장 경로")
+    sp.set_defaults(func=cmd_pareto)
 
     sp = sub.add_parser("build-graph", help="OSM 도로 그래프 다운로드·캐시(osm 라우팅용)")
     add_common(sp)

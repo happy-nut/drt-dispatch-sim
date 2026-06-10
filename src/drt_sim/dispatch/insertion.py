@@ -56,8 +56,16 @@ class DispatchEngine:
     def _best_insertion_for_vehicle(
         self, request: Request, vehicle: Vehicle, now: float
     ) -> Optional[InsertionPlan]:
-        pickup = RouteStop(request.id, StopType.PICKUP, request.origin, request.party_size)
-        dropoff = RouteStop(request.id, StopType.DROPOFF, request.destination, request.party_size)
+        meta = dict(
+            request_time=request.request_time,
+            max_wait=request.max_wait,
+            direct_time=request.direct_travel_time(),
+            max_detour=request.max_detour_factor,
+        )
+        pickup = RouteStop(request.id, StopType.PICKUP, request.origin,
+                           request.party_size, **meta)
+        dropoff = RouteStop(request.id, StopType.DROPOFF, request.destination,
+                            request.party_size, **meta)
 
         base_cost = self._route_travel_time(vehicle.location, vehicle.route)
         best: Optional[InsertionPlan] = None
@@ -69,7 +77,7 @@ class DispatchEngine:
                 candidate.insert(pi, pickup)
                 candidate.insert(di + 1, dropoff)  # 픽업 삽입으로 한 칸 밀림
 
-                if not self._feasible(candidate, vehicle, request, now):
+                if not self._feasible(candidate, vehicle, now):
                     continue
 
                 new_cost = self._route_travel_time(vehicle.location, candidate)
@@ -87,14 +95,13 @@ class DispatchEngine:
 
     # --- 제약 검사 -------------------------------------------------------
 
-    def _feasible(
-        self,
-        route: List[RouteStop],
-        vehicle: Vehicle,
-        new_request: Request,
-        now: float,
-    ) -> bool:
-        """정원·대기·우회 제약을 모두 만족하면 True."""
+    def _feasible(self, route: List[RouteStop], vehicle: Vehicle, now: float) -> bool:
+        """정원·대기·우회 제약을 **경로 위 모든 승객에 대해** 만족하면 True.
+
+        새 요청뿐 아니라, 같은 차에 이미 탔거나 배차된 다른 승객의 대기·우회도 함께
+        재검증한다(삽입이 기존 승객을 한도 넘게 돌리지 못하게). 이미 탑승한 승객은
+        ``boarded_at`` 으로, 아직 안 탄 승객은 경로상의 픽업 시각으로 우회를 계산한다.
+        """
         load = vehicle.onboard
         t = now
         prev_loc: Point = vehicle.location
@@ -110,18 +117,15 @@ class DispatchEngine:
                 if load > vehicle.capacity:
                     return False
                 pickup_times[stop.request_id] = t
-
-                if stop.request_id == new_request.id:
-                    wait = t - new_request.request_time
-                    if wait > new_request.max_wait:
-                        return False
+                # 모든 승객의 픽업 대기 윈도우 검사
+                if t - stop.request_time > stop.max_wait:
+                    return False
             else:  # DROPOFF
                 load -= stop.party_size
-
-                if stop.request_id == new_request.id:
-                    onboard_dur = t - pickup_times.get(stop.request_id, t)
-                    direct = new_request.direct_travel_time()
-                    if onboard_dur > direct * new_request.max_detour_factor:
+                # 탑승 시각: 경로상 픽업 > 이미 탑승(boarded_at). 둘 다 없으면 검사 생략.
+                board = pickup_times.get(stop.request_id, stop.boarded_at)
+                if board is not None and stop.direct_time > 0:
+                    if (t - board) > stop.direct_time * stop.max_detour:
                         return False
         return True
 

@@ -151,6 +151,11 @@ class World:
             vehicle.onboard += req.party_size
             req.status = RequestStatus.ONBOARD
             req.pickup_time = ctx.now
+            # 남은 하차 정류점에 실제 탑승 시각을 기록 → 이후 삽입 시 우회 재검증 기준.
+            for s in vehicle.route:
+                if s.request_id == req.id and s.stop_type == StopType.DROPOFF:
+                    s.boarded_at = ctx.now
+                    break
             self.tracer.emit(ctx.now, req.trace_id, "world", "pickup",
                              f"veh#{vehicle.id}", req.id)
         else:

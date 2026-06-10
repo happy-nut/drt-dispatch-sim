@@ -59,6 +59,12 @@ class RouteStop:
     stop_type: StopType
     location: Point
     party_size: int = 1          # 이 정류점이 태우/내리는 인원(정원 검사 정확도)
+    # 이 정류점의 요청 제약(경로가 스스로 모든 승객의 대기·우회를 재검증할 수 있게).
+    request_time: float = 0.0    # 호출 시각(픽업 대기 검사 기준)
+    max_wait: float = 1e9        # 최대 허용 대기(초)
+    direct_time: float = 0.0     # 직선 이동시간(우회 검사 기준)
+    max_detour: float = 1e9      # 허용 우회 배율
+    boarded_at: Optional[float] = None  # 실제 탑승 시각(이미 탄 승객의 우회 재검증용)
     # 계획된 도착 예정 시각 (planning 중 채워짐)
     eta: Optional[float] = None
 
