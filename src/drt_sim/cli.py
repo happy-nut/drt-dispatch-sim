@@ -92,11 +92,16 @@ def cmd_build_graph(args) -> int:
         return 1
     import os
 
-    dist = int(cfg.area.size_km * 1000 * 0.75)
+    # 운영지역 정사각형의 반대각(코너)까지 덮도록 반경을 넉넉히(half-diagonal=0.707*size,
+    # +여유). 좁게 받으면 다리가 잘려 강 양안이 분리되고 경로 탐색이 직선 폴백된다.
+    dist = int(cfg.area.size_km * 1000 * 0.85)
     print(f"OSM 도로망 다운로드: 중심({cfg.area.center_lat},{cfg.area.center_lon}) "
           f"반경 {dist}m … (네트워크 필요)")
     g = ox.graph_from_point((cfg.area.center_lat, cfg.area.center_lon),
                             dist=dist, network_type="drive", simplify=True)
+    # 최대 강연결(strongly connected) 컴포넌트만 유지 → 모든 노드 쌍에 방향성 경로 존재
+    # → NoPath 직선 폴백(강을 가로지르는 직선)이 사라진다.
+    g = ox.truncate.largest_component(g, strongly=True)
     out = cfg.routing.graph_path
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     ox.save_graphml(g, out)

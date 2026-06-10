@@ -61,19 +61,46 @@ class OSMRouter:
         if na == nb:
             return [a, b]
         key = (na, nb)
-        mid = self._path_cache.get(key)
-        if mid is None:
+        poly = self._path_cache.get(key)
+        if poly is None:
             try:
                 nodes = nx.shortest_path(self.G, na, nb, weight="length")
-                mid = [
-                    Point(*self.proj.to_km(self.G.nodes[n]["y"], self.G.nodes[n]["x"]))
-                    for n in nodes
+                poly = self._geometry_polyline(nodes)
+                if not poly:
+                    raise ValueError("empty geometry")
+            except Exception:  # 경로 없음 등 → 노드 직선 폴백
+                poly = [
+                    Point(*self.proj.to_km(self.G.nodes[na]["y"], self.G.nodes[na]["x"])),
+                    Point(*self.proj.to_km(self.G.nodes[nb]["y"], self.G.nodes[nb]["x"])),
                 ]
-            except Exception:  # 경로 없음 등 → 직선 폴백
-                mid = [a, b]
-            self._path_cache[key] = mid
-        # 실제 좌표가 도로 노드와 약간 떨어져 있으니 양끝을 정확히 붙인다.
-        return [a, *mid, b]
+            self._path_cache[key] = poly
+        # 양끝을 raw 지점이 아니라 도로 노드에 스냅(=poly 자체)해서, 도로에서 떨어진
+        # 승하차 지점으로 직선으로 튀는 connector 를 없앤다. 전체가 도로 형상만 따른다.
+        return poly
+
+    def _geometry_polyline(self, nodes: List[int]) -> List[Point]:
+        """경로 노드 사이를 **엣지 geometry(실제 도로 곡선)**로 잇는다.
+
+        simplify 된 그래프에서 교차점 노드만 직선으로 이으면 도로 곡선을 무시해
+        강·블록을 가로지른다. 엣지에 저장된 LineString 좌표를 펼쳐 도로를 따라간다.
+        """
+        pts: List[Point] = []
+        for u, w in zip(nodes[:-1], nodes[1:]):
+            data = self.G.get_edge_data(u, w) or {}
+            edge = min(data.values(), key=lambda e: e.get("length", 1.0)) if data else {}
+            geom = edge.get("geometry")
+            if geom is not None:
+                coords = list(geom.coords)  # shapely LineString: (lon, lat)
+            else:  # 직선 엣지(교차점 인접) — 양 끝 노드만
+                coords = [
+                    (self.G.nodes[u]["x"], self.G.nodes[u]["y"]),
+                    (self.G.nodes[w]["x"], self.G.nodes[w]["y"]),
+                ]
+            for lon, lat in coords:
+                p = Point(*self.proj.to_km(lat, lon))
+                if not pts or pts[-1].x != p.x or pts[-1].y != p.y:
+                    pts.append(p)
+        return pts
 
 
 def load_router(backend: str, projection: GeoProjection,
